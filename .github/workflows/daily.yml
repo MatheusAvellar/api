@@ -22,7 +22,7 @@ jobs:
       # (comes preinstalled) takes a long while to upgrade. So we remove it first
       - name: Setup apt
         run: |
-          sudo apt-get remove --purge firefox && sudo apt-get autoremove
+          sudo apt-get remove --purge firefox powershell && sudo apt-get autoremove
           sudo apt-get -y upgrade
           sudo apt-get update
 
@@ -34,7 +34,7 @@ jobs:
       - name: Fetch RSS feeds
         run: |
           python3 -m pip install -r ./scripts/requirements.txt
-          python3 ./scripts/rss.py
+          python3 ./scripts/eu-rss.py
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

@@ -257,5 +257,5 @@ full_rss.sort(reverse=True, key=lambda obj: datetime.datetime.fromisoformat(obj[
 
 MAX_EVENTS = 50
 print(f"Full event list has size {len(full_rss)}; only the latest {MAX_EVENTS} will be copied")
-with open("./public/rss.json", "w") as f:
+with open("./public/eu/rss.json", "w") as f:
 	f.write(json.dumps(full_rss[:MAX_EVENTS]))

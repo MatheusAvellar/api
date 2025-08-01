@@ -1,0 +1,66 @@
+html {
+	font-family: "Inter", "Roboto", sans-serif;
+	color: #111;
+	background-color: #fefefe;
+}
+@supports (font-variation-settings: normal) {
+	html {
+		font-family: "Inter var", "Roboto", sans-serif;
+	}
+}
+body {
+	margin: 1em;
+}
+header, main, footer {
+	max-width: 800px;
+	margin: auto;
+}
+header {
+	margin-bottom: 1em;
+}
+footer {
+	padding-top: 1em;
+}
+h1, h2, h3 {
+	margin: 1.5em 0 .5em;
+}
+ul {
+	padding: 0 1em;
+	margin: 0;
+	list-style: none;
+}
+li {
+	border-left: 4px solid #e8e8e8;
+	padding: 0 1em;
+	margin: .75em 0;
+}
+p {
+	margin: 0;
+}
+a[href] {
+	color: #2767d9;
+	text-decoration: none;
+}
+a[href]:hover, a[href]:focus {
+	text-decoration: underline;
+}
+b, .description {
+	font-weight: 600;
+}
+.subtitle {
+	font-size: 110%;
+}
+
+hr {
+	overflow: visible;
+	height: 1px;
+	background-color: #e8e8e8;
+	border: none;
+	outline: none;
+	margin: 3em;
+}
+footer {
+	text-align: right;
+	color: #aaa;
+	font-size: 85%;
+}
