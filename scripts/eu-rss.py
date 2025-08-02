@@ -133,12 +133,17 @@ def wikipedia():
 				.split("</p>")[0]
 				.strip()
 			)
+			# Edits to structured data
+			if edit_description == "/* wbeditentity-update:0| */":
+				continue
+			wiki_prefix = url.removeprefix("https://").split(".")[0]
 			output.append({
 				"url": edit_url,
 				"datetime": edit_datetime,
 				"title": page_title,
 				"type": "wiki",
 				"details": {
+					"kind": wiki_prefix,
 					"description": edit_description
 				}
 			})
@@ -217,7 +222,38 @@ def github():
 		# 	<content type="html">...</content>
 		# </entry>
 		event_url = entry.find("link", { "rel": "alternate" }).get("href")
-		event_title = get_text(entry.find("title")).removeprefix("MatheusAvellar ")
+
+		def get_title_parts(s):
+			# Push to branch
+			if s.startswith("pushed to"):
+				return ( "Pushed to branch", s.split("pushed to")[1].strip() )
+			# Pull request
+			if s.startswith("opened a pull"):
+				return ( "Pull request", s.split("pull request in")[1].strip() )
+			# Create repository
+			if s.startswith("created a repository"):
+				return ( "Created repository", s.split("repository")[1].strip() )
+			# Create branch
+			if s.startswith("created a branch"):
+				return ( "Created branch", s.split("created a branch")[1].strip() )
+			# Delete branch
+			if s.startswith("deleted branch"):
+				return ( "Deleted branch", s.split("deleted branch")[1].strip() )
+			# ?
+			return (s, "")
+
+		event_title, event_details = get_title_parts(
+			get_text(entry.find("title")).removeprefix("MatheusAvellar ")
+		)
+		branch = ""
+		repository = None
+		if " in " in event_details:
+			(branch, repository) = event_details.split(" in ")
+		elif " at " in event_details:
+			(branch, repository) = event_details.split(" at ")
+		else:
+			repository = event_details
+
 		updated = get_text(entry.find("updated"))
 		dt = datetime.datetime.strptime(updated, "%Y-%m-%dT%H:%M:%S%z")
 		# If this event is older than a month, ignore it
@@ -232,7 +268,9 @@ def github():
 			"title": event_title,
 			"type": "github",
 			"details": {
-				"event": event_type
+				"event": event_type,
+				"branch": branch,
+				"repository": repository
 			}
 		})
 	print(f"Finished reading XML; got {len(output)} entries. Limiting to latest 10")
