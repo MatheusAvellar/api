@@ -23,6 +23,14 @@ def get_xml(url):
 	return BeautifulSoup(res.text, "xml")
 
 
+def std_datetime(date):
+	return (
+		date
+		.astimezone(tz=datetime.timezone.utc)
+		.isoformat()
+	)
+
+
 def letterboxd():
 	soup = get_xml("https://letterboxd.com/matheusavellar/rss/")
 	if soup is None:
@@ -57,11 +65,7 @@ def letterboxd():
 		# If this event is older than a month, ignore it
 		if dt < (datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(days=30)):
 			continue
-		review_datetime = (
-			dt
-			.astimezone(tz=datetime.timezone.utc)
-			.isoformat()
-		)
+		review_datetime = std_datetime(dt)
 		watched_date = get_text(review.find("letterboxd:watchedDate"))
 		is_rewatch = get_text(review.find("letterboxd:rewatch")) != "No"
 		film_title = get_text(review.find("letterboxd:filmTitle"))
@@ -73,7 +77,7 @@ def letterboxd():
 		output.append({
 			"url": review_url,
 			"datetime": review_datetime,
-			"title": f"{film_title} ({film_year})",
+			"title": f"{film_title} ({film_year})" if film_year else film_title,
 			"type": "letterboxd",
 			"details": {
 				"watched_date": watched_date,
@@ -121,11 +125,7 @@ def wikipedia():
 			# If this event is older than a month, ignore it
 			if dt < (datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(days=30)):
 				continue
-			edit_datetime = (
-				dt
-				.astimezone(tz=datetime.timezone.utc)
-				.isoformat()
-			)
+			edit_datetime = std_datetime(dt)
 			summary = get_text(entry.find("summary"))
 			edit_description = (
 				summary
@@ -179,11 +179,7 @@ def mal():
 		# If this event is older than a month, ignore it
 		if dt < (datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(days=30)):
 			continue
-		update_datetime = (
-			dt
-			.astimezone(tz=datetime.timezone.utc)
-			.isoformat()
-		)
+		update_datetime = std_datetime(dt)
 		output.append({
 			"url": anime_url,
 			"datetime": update_datetime,
@@ -227,11 +223,7 @@ def github():
 		# If this event is older than a month, ignore it
 		if dt < (datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(days=30)):
 			continue
-		event_datetime = (
-			dt
-			.astimezone(tz=datetime.timezone.utc)
-			.isoformat()
-		)
+		event_datetime = std_datetime(dt)
 		event_type = get_text(entry.find("id")).removeprefix("tag:github.com,2008:").split("/")[0]
 
 		output.append({
@@ -255,7 +247,17 @@ full_rss.extend(github())
 full_rss.extend(mal())
 full_rss.sort(reverse=True, key=lambda obj: datetime.datetime.fromisoformat(obj["datetime"]))
 
+for obj in full_rss:
+	obj["datetime"] = obj["datetime"].replace("+00:00", "Z")
+
 MAX_EVENTS = 50
 print(f"Full event list has size {len(full_rss)}; only the latest {MAX_EVENTS} will be copied")
+
+right_now = datetime.datetime.now(tz=datetime.timezone.utc)
 with open("./public/eu/rss.json", "w") as f:
-	f.write(json.dumps(full_rss[:MAX_EVENTS]))
+	f.write(
+		json.dumps({
+			"updated_at": std_datetime(right_now).replace("+00:00", "Z"),
+			"data": full_rss[:MAX_EVENTS]
+		})
+	)
