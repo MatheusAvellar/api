@@ -239,11 +239,17 @@ def github():
 			# Delete branch
 			if s.startswith("deleted branch"):
 				return ( "Deleted branch", s.split("deleted branch")[1].strip() )
+			# Made repository public
+			m = re.match(r"^made ([^\s/]+/[^\s/]+) public")
+			if m is not None:
+				repo = m.group(1)
+				return ( "Made public", repo )
+
 			# ?
-			return (s, "")
+			return (s.capitalize(), "")
 
 		event_title, event_details = get_title_parts(
-			get_text(entry.find("title")).removeprefix("MatheusAvellar ")
+			get_text(entry.find("title")).removeprefix("MatheusAvellar ").strip()
 		)
 		branch = ""
 		repository = None
@@ -276,6 +282,10 @@ def github():
 	print(f"Finished reading XML; got {len(output)} entries. Limiting to latest 10")
 	output.sort(reverse=True, key=lambda obj: datetime.datetime.fromisoformat(obj["datetime"]))
 	return output[:10]
+
+
+# Flickr:
+# https://www.flickr.com/services/feeds/photos_public.gne?id=202939403@N02
 
 
 full_rss = []
