@@ -240,7 +240,7 @@ def github():
 			if s.startswith("deleted branch"):
 				return ( "Deleted branch", s.split("deleted branch")[1].strip() )
 			# Made repository public
-			m = re.match(r"^made ([^\s/]+/[^\s/]+) public")
+			m = re.match(r"^made ([^\s/]+/[^\s/]+) public", s)
 			if m is not None:
 				repo = m.group(1)
 				return ( "Made public", repo )
