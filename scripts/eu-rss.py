@@ -73,7 +73,7 @@ def letterboxd():
 		rating = get_text(review.find("letterboxd:memberRating"))
 		tmdb_id = get_text(review.find("tmdb:movieId"))
 		description = get_text(review.find("description"))
-		poster_url = (re.search(r"<img src=\"([^\"]+)\"", description) or [0,""])[1]
+		# poster_url = (re.search(r"<img src=\"([^\"]+)\"", description) or [0,""])[1]
 		output.append({
 			"url": review_url,
 			"datetime": review_datetime,
@@ -86,7 +86,7 @@ def letterboxd():
 				"raw_year": film_year,
 				"rating": rating,
 				"tmdb_id": tmdb_id,
-				"poster_url": poster_url
+				# "poster_url": poster_url
 			}
 		})
 	print(f"Finished reading XML; got {len(output)} entries. Limiting to latest 10")
@@ -244,6 +244,9 @@ def github():
 			if m is not None:
 				repo = m.group(1)
 				return ( "Made public", repo )
+			# Star repository
+			if s.startswith("starred"):
+				return ( "Starred repository", s.removeprefix("starred").strip() )
 
 			# ?
 			return (s.capitalize(), "")
