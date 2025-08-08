@@ -251,9 +251,11 @@ def github():
 			# ?
 			return (s.capitalize(), "")
 
-		event_title, event_details = get_title_parts(
+		event_description, event_details = get_title_parts(
 			get_text(entry.find("title")).removeprefix("MatheusAvellar ").strip()
 		)
+
+
 		branch = ""
 		repository = None
 		if " in " in event_details:
@@ -262,6 +264,13 @@ def github():
 			(branch, repository) = event_details.split(" at ")
 		else:
 			repository = event_details
+
+		# Too many of these, let's just ignore them
+		if event_description == "Pushed to branch":
+			continue
+		# This is a duplicate of "created repository" (in 99.99% of cases)
+		if event_description == "Created branch" and branch == "main":
+			continue
 
 		updated = get_text(entry.find("updated"))
 		dt = datetime.datetime.strptime(updated, "%Y-%m-%dT%H:%M:%S%z")
@@ -274,10 +283,11 @@ def github():
 		output.append({
 			"url": event_url,
 			"datetime": event_datetime,
-			"title": event_title,
+			"title": repository or event_description,
 			"type": "github",
 			"details": {
 				"event": event_type,
+				"description": event_description,
 				"branch": branch,
 				"repository": repository
 			}

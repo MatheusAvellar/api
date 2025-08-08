@@ -34,7 +34,7 @@ jobs:
       - name: Fetch RSS feeds
         run: |
           python3 -m pip install -r ./scripts/requirements.txt
-          python3 ./scripts/eu-rss.py
+          python3 ./scripts/my-rss.py
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
