@@ -80,6 +80,7 @@ def letterboxd():
 			"title": f"{film_title} ({film_year})" if film_year else film_title,
 			"type": "letterboxd",
 			"details": {
+				"event": "review",
 				"watched_date": watched_date,
 				"is_rewatch": is_rewatch,
 				"raw_title": film_title,
@@ -91,7 +92,7 @@ def letterboxd():
 		})
 	print(f"Finished reading XML; got {len(output)} entries. Limiting to latest 10")
 	output.sort(reverse=True, key=lambda obj: datetime.datetime.fromisoformat(obj["datetime"]))
-	return output[:10]
+	return output
 
 
 def wikipedia():
@@ -136,6 +137,14 @@ def wikipedia():
 			# Edits to structured data
 			if edit_description == "/* wbeditentity-update:0| */":
 				continue
+
+			event = "edit-page"
+			if edit_description.startswith("Uploaded a work"):
+				event = "file-upload";
+			elif edit_description.lower().startswith("create article") \
+				or edit_description.lower().startswith("cria artigo"):
+				event = "create-article";
+
 			wiki_prefix = url.removeprefix("https://").split(".")[0]
 			output.append({
 				"url": edit_url,
@@ -143,13 +152,14 @@ def wikipedia():
 				"title": page_title,
 				"type": "wiki",
 				"details": {
+					"event": event,
 					"kind": wiki_prefix,
 					"description": edit_description
 				}
 			})
 	print(f"Finished reading XML; got {len(output)} entries. Limiting to latest 10")
 	output.sort(reverse=True, key=lambda obj: datetime.datetime.fromisoformat(obj["datetime"]))
-	return output[:10]
+	return output
 
 
 def mal():
@@ -191,6 +201,7 @@ def mal():
 			"title": anime_title,
 			"type": "mal",
 			"details": {
+				"event": "watch",
 				"status": watch_status,
 				"episodes_watched": episodes_watched,
 				"episodes_total": episodes_total
@@ -198,7 +209,7 @@ def mal():
 		})
 	print(f"Finished reading XML; got {len(output)} entries. Limiting to latest 10")
 	output.sort(reverse=True, key=lambda obj: datetime.datetime.fromisoformat(obj["datetime"]))
-	return output[:10]
+	return output
 
 
 def github():
@@ -294,18 +305,32 @@ def github():
 		})
 	print(f"Finished reading XML; got {len(output)} entries. Limiting to latest 10")
 	output.sort(reverse=True, key=lambda obj: datetime.datetime.fromisoformat(obj["datetime"]))
-	return output[:10]
+	return output
 
 
 # Flickr:
 # https://www.flickr.com/services/feeds/photos_public.gne?id=202939403@N02
 
 
+def filter_duplicates(evt_list):
+	output = []
+	seen = set()
+	for event in evt_list:
+		title = event["title"]
+		evt_type = event["details"]["event"]
+		key = f"{title}-{evt_type}"
+		if key in seen:
+			continue
+		seen.add(key)
+		output.append(event)
+	return output
+
+
 full_rss = []
-full_rss.extend(letterboxd())
-full_rss.extend(wikipedia())
-full_rss.extend(github())
-full_rss.extend(mal())
+full_rss.extend(filter_duplicates(letterboxd())[:10])
+full_rss.extend(filter_duplicates(wikipedia())[:10])
+full_rss.extend(filter_duplicates(github())[:10])
+full_rss.extend(filter_duplicates(mal())[:10])
 full_rss.sort(reverse=True, key=lambda obj: datetime.datetime.fromisoformat(obj["datetime"]))
 
 for obj in full_rss:
@@ -315,7 +340,7 @@ MAX_EVENTS = 50
 print(f"Full event list has size {len(full_rss)}; only the latest {MAX_EVENTS} will be copied")
 
 right_now = datetime.datetime.now(tz=datetime.timezone.utc)
-with open("./public/eu/rss.json", "w") as f:
+with open("./public/eu/rss.json", "w", encoding="utf-8") as f:
 	f.write(
 		json.dumps({
 			"updated_at": std_datetime(right_now).replace("+00:00", "Z"),
