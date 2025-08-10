@@ -141,7 +141,11 @@ def wikipedia():
 			if edit_description.startswith("Uploaded a work"):
 				event = "file-upload";
 			elif edit_description.lower().startswith("create article") \
-				or edit_description.lower().startswith("cria artigo"):
+				or edit_description.lower().startswith("create category") \
+				or edit_description.lower().startswith("create draft") \
+				or edit_description.lower().startswith("cria artigo") \
+				or edit_description.lower().startswith("cria categoria") \
+				or edit_description.lower().startswith("cria rascunho"):
 				event = "create-article";
 
 			wiki_prefix = url.removeprefix("https://").split(".")[0]
