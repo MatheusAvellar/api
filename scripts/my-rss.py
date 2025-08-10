@@ -17,8 +17,7 @@ def get_xml(url):
 	print(f"Response status: HTTP {res.status_code}")
 	if res.status_code >= 400:
 		return
-	# [Ref] https://stackoverflow.com/a/52615216/4824627
-	res.encoding = res.apparent_encoding
+	res.encoding = "utf-8"
 	print(f"Got response of size '{len(res.text)}'")
 	return BeautifulSoup(res.text, "xml")
 
