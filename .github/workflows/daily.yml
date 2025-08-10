@@ -16,6 +16,9 @@ permissions:
 jobs:
   fetch_and_deploy:
     runs-on: ubuntu-22.04
+    env:
+      LC_ALL: en_US.UTF-8
+      LANG: en_US.UTF-8
     steps:
       # Situation: we sometimes get an HTTP 404 error when `apt-get update`ing.
       # We need to run `apt-get upgrade` to solve that. But I've noticed Firefox
