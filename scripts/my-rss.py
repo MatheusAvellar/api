@@ -216,96 +216,109 @@ def mal():
 
 
 def github():
-	soup = get_xml("https://github.com/MatheusAvellar.atom")
-	if soup is None:
-		return []
-
+	urls = [
+		"https://github.com/MatheusAvellar.atom",
+		"https://gist.github.com/MatheusAvellar.atom",
+	]
 	output = []
-	for entry in soup.find_all("entry"):
-		# <entry>
-		# 	<id>tag:github.com,2008:PullRequestEvent/52789137971</id>
-		# 	<published>2025-07-31T14:32:52Z</published>
-		# 	<updated>2025-07-31T14:32:52Z</updated>
-		# 	<link type="text/html" rel="alternate" href="https://github.com/prefeitura-rio/pipelines_rj_sms/pull/432"/>
-		# 	<title type="html">MatheusAvellar opened a pull request in prefeitura-rio/pipelines_rj_sms</title>
-		# 	<author>
-		# 		<name>MatheusAvellar</name>
-		# 		<uri>https://github.com/MatheusAvellar</uri>
-		# 	</author>
-		# 	<media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/1719996?s=30&amp;v=4"/>
-		# 	<content type="html">...</content>
-		# </entry>
-		event_url = entry.find("link", { "rel": "alternate" }).get("href")
-
-		def get_title_parts(s):
-			# Push to branch
-			if s.startswith("pushed to"):
-				return ( "Pushed to branch", s.split("pushed to")[1].strip() )
-			# Pull request
-			if s.startswith("opened a pull"):
-				return ( "Pull request", s.split("pull request in")[1].strip() )
-			# Create repository
-			if s.startswith("created a repository"):
-				return ( "Created repository", s.split("repository")[1].strip() )
-			# Create branch
-			if s.startswith("created a branch"):
-				return ( "Created branch", s.split("created a branch")[1].strip() )
-			# Delete branch
-			if s.startswith("deleted branch"):
-				return ( "Deleted branch", s.split("deleted branch")[1].strip() )
-			# Made repository public
-			m = re.match(r"^made ([^\s/]+/[^\s/]+) public", s)
-			if m is not None:
-				repo = m.group(1)
-				return ( "Made public", repo )
-			# Star repository
-			if s.startswith("starred"):
-				return ( "Starred repository", s.removeprefix("starred").strip() )
-
-			# ?
-			return (s.capitalize(), "")
-
-		event_description, event_details = get_title_parts(
-			get_text(entry.find("title")).removeprefix("MatheusAvellar ").strip()
-		)
-
-
-		branch = ""
-		repository = None
-		if " in " in event_details:
-			(branch, repository) = event_details.split(" in ")
-		elif " at " in event_details:
-			(branch, repository) = event_details.split(" at ")
-		else:
-			repository = event_details
-
-		# Too many of these, let's just ignore them
-		if event_description == "Pushed to branch":
-			continue
-		# This is a duplicate of "created repository" (in 99.99% of cases)
-		if event_description == "Created branch" and branch == "main":
+	for url in urls:
+		soup = get_xml(url)
+		if soup is None:
 			continue
 
-		updated = get_text(entry.find("updated"))
-		dt = datetime.datetime.strptime(updated, "%Y-%m-%dT%H:%M:%S%z")
-		# If this event is older than a month, ignore it
-		if dt < (datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(days=30)):
-			continue
-		event_datetime = std_datetime(dt)
-		event_type = get_text(entry.find("id")).removeprefix("tag:github.com,2008:").split("/")[0]
+		for entry in soup.find_all("entry"):
+			# <entry>
+			# 	<id>tag:github.com,2008:PullRequestEvent/52789137971</id>
+			# 	<published>2025-07-31T14:32:52Z</published>
+			# 	<updated>2025-07-31T14:32:52Z</updated>
+			# 	<link type="text/html" rel="alternate" href="https://github.com/prefeitura-rio/pipelines_rj_sms/pull/432"/>
+			# 	<title type="html">MatheusAvellar opened a pull request in prefeitura-rio/pipelines_rj_sms</title>
+			# 	<author>
+			# 		<name>MatheusAvellar</name>
+			# 		<uri>https://github.com/MatheusAvellar</uri>
+			# 	</author>
+			# 	<media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/1719996?s=30&amp;v=4"/>
+			# 	<content type="html">...</content>
+			# </entry>
+			event_url = entry.find("link", { "rel": "alternate" }).get("href")
 
-		output.append({
-			"url": event_url,
-			"datetime": event_datetime,
-			"title": repository or event_description,
-			"type": "github",
-			"details": {
-				"event": event_type,
-				"description": event_description,
-				"branch": branch,
-				"repository": repository
-			}
-		})
+			def get_title_parts(s):
+				# Push to branch
+				if s.startswith("pushed to"):
+					return ( "Pushed to branch", s.split("pushed to")[1].strip() )
+				# Pull request
+				if s.startswith("opened a pull"):
+					return ( "Pull request", s.split("pull request in")[1].strip() )
+				# Create repository
+				if s.startswith("created a repository"):
+					return ( "Created repository", s.split("repository")[1].strip() )
+				# Create branch
+				if s.startswith("created a branch"):
+					return ( "Created branch", s.split("created a branch")[1].strip() )
+				# Delete branch
+				if s.startswith("deleted branch"):
+					return ( "Deleted branch", s.split("deleted branch")[1].strip() )
+				# Made repository public
+				m = re.match(r"^made ([^\s/]+/[^\s/]+) public", s)
+				if m is not None:
+					repo = m.group(1)
+					return ( "Made public", repo )
+				# Star repository
+				if s.startswith("starred"):
+					return ( "Starred repository", s.removeprefix("starred").strip() )
+
+				# Gist titles, unknown events
+				# Make sure first letter is capitalized
+				# (.capitalize() lowercases all other letters)
+				return ((s[:1].upper() + s[1:]), "")
+
+			event_description, event_details = get_title_parts(
+				get_text(entry.find("title")).removeprefix("MatheusAvellar ").strip()
+			)
+
+			branch = ""
+			repository = None
+			if " in " in event_details:
+				(branch, repository) = event_details.split(" in ")
+			elif " at " in event_details:
+				(branch, repository) = event_details.split(" at ")
+			else:
+				repository = event_details
+
+			# Too many of these, let's just ignore them
+			if event_description == "Pushed to branch":
+				continue
+			# This is a duplicate of "created repository" (in 99.99% of cases)
+			if event_description == "Created branch" and branch == "main":
+				continue
+
+			updated = get_text(entry.find("updated"))
+			dt = datetime.datetime.strptime(updated, "%Y-%m-%dT%H:%M:%S%z")
+			# If this event is older than a month, ignore it
+			if dt < (datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(days=30)):
+				continue
+			event_datetime = std_datetime(dt)
+			event_type = (
+				get_text(entry.find("id"))
+				.removeprefix("tag:github.com,2008:")
+				.removeprefix("tag:gist.github.com,2008:")
+				.split("/")[0]
+			)
+
+			gh_prefix = url.removeprefix("https://").split(".")[0]
+			output.append({
+				"url": event_url,
+				"datetime": event_datetime,
+				"title": repository or event_description,
+				"type": "github",
+				"details": {
+					"event": event_type,
+					"kind": gh_prefix,
+					"description": event_description,
+					"branch": branch,
+					"repository": repository
+				}
+			})
 	print(f"Finished reading XML; got {len(output)} entries. Limiting to latest 10")
 	output.sort(reverse=True, key=lambda obj: datetime.datetime.fromisoformat(obj["datetime"]))
 	return output
