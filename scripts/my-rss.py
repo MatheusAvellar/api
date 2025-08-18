@@ -265,7 +265,10 @@ def github():
 					return ( "Made public", repo )
 				# Star repository
 				if s.startswith("starred"):
-					return ( "Starred repository", s.removeprefix("starred").strip() )
+					return ( "Starred repository", s.split("starred")[1].strip() )
+				# Close issue
+				if s.startswith("closed an issue"):
+					return ( "Closed an issue", s.split("closed an issue in")[1].strip() )
 
 				# Gist titles, unknown events
 				# Make sure first letter is capitalized
