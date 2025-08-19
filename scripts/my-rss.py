@@ -246,9 +246,12 @@ def github():
 				# Push to branch
 				if s.startswith("pushed to"):
 					return ( "Pushed to branch", s.split("pushed to")[1].strip() )
-				# Pull request
+				# Open pull request
 				if s.startswith("opened a pull"):
-					return ( "Pull request", s.split("pull request in")[1].strip() )
+					return ( "Opened pull request", s.split("pull request in")[1].strip() )
+				# Close pull request
+				if s.startswith("closed a pull"):
+					return ( "Closed pull request", s.split("pull request in")[1].strip() )
 				# Create repository
 				if s.startswith("created a repository"):
 					return ( "Created repository", s.split("repository")[1].strip() )
