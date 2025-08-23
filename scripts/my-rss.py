@@ -298,11 +298,44 @@ def github():
 			if event_description == "Created branch" and branch == "main":
 				continue
 
+			###################################
 			updated = get_text(entry.find("updated"))
-			dt = datetime.datetime.strptime(updated, "%Y-%m-%dT%H:%M:%S%z")
-			# If this event is older than a month, ignore it
-			if dt < (datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(days=30)):
+			dt = None
+			possible_formats = [
+				# This used to work
+				"%Y-%m-%dT%H:%M:%S%z",
+				# Changed to this for some reason
+				"%Y-%m-%d %H:%M:%S %z",
+				# Testing locally, got some of these too
+				"%Y-%m-%d %H:%M:%S UTC",
+				# For completeness' sake
+				"%Y-%m-%dT%H:%M:%S UTC"
+			]
+			for fmt in possible_formats:
+				try:
+					# ValueError: time data '2025-08-22 09:59:06 -0700' does not match format ...
+					dt = datetime.datetime.strptime(updated, fmt)
+					break
+				except:
+					pass
+			if dt is None:
+				print("[!] Could not find appropriate datetime format")
+				print(type(updated), updated)
 				continue
+
+			# `dt` here might not have timezone; set to UTC if so
+			if dt.tzinfo is None:
+				print("Adding timezone info")
+				dt = dt.replace(tzinfo=datetime.timezone.utc)
+
+			# If this event is older than a month, ignore it
+			month_ago = (
+				datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(days=30)
+			)
+			if dt < month_ago:
+				continue
+			###################################
+
 			event_datetime = std_datetime(dt)
 			event_type = (
 				get_text(entry.find("id"))
@@ -352,7 +385,7 @@ full_rss = []
 full_rss.extend(filter_duplicates(letterboxd())[:10])
 full_rss.extend(filter_duplicates(wikipedia())[:10])
 full_rss.extend(filter_duplicates(github())[:10])
-full_rss.extend(filter_duplicates(mal())[:10])
+# full_rss.extend(filter_duplicates(mal())[:10])
 full_rss.sort(reverse=True, key=lambda obj: datetime.datetime.fromisoformat(obj["datetime"]))
 
 for obj in full_rss:
