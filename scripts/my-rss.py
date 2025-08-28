@@ -11,9 +11,13 @@ def get_text(element: BeautifulSoup | None):
 	return ""
 
 
-def get_xml(url):
+def get_xml(url, headers=None):
 	print(f"Sending GET to '{url}'")
-	res = requests.get(url=url)
+	res = None
+	if headers:
+		res = requests.get(url=url, headers=headers)
+	else:
+		res = requests.get(url=url)
 	print(f"Response status: HTTP {res.status_code}")
 	if res.status_code >= 400:
 		return
@@ -102,8 +106,13 @@ def wikipedia():
 		f"https://pt.wikipedia.org/w/api.php?{params}",
 	]
 	output = []
+	default_headers = requests.utils.default_headers() 
+	default_ua = default_headers["User-Agent"] if "User-Agent" in default_headers else ""
+	custom_ua = f"AvelludoRSS/0.0 (https://en.wikipedia.org/wiki/User:Avelludo; selfrss@avl.la) {default_ua}".strip()
+
 	for url in urls:
-		soup = get_xml(url)
+		# [Ref] https://foundation.wikimedia.org/wiki/Policy:Wikimedia_Foundation_User-Agent_Policy
+		soup = get_xml(url, headers={ "User-Agent": custom_ua })
 		if soup is None:
 			continue
 
@@ -216,149 +225,113 @@ def mal():
 
 
 def github():
-	urls = [
-		"https://github.com/MatheusAvellar.atom",
-		"https://gist.github.com/MatheusAvellar.atom",
-	]
+	# https://docs.github.com/en/rest/activity/events?apiVersion=2022-11-28#list-public-events-for-a-user
+	GH_ENDPOINT = "https://api.github.com/users/MatheusAvellar/events/public"
+	print(f"Sending GET to '{GH_ENDPOINT}'")
+	res = requests.get(
+		url=GH_ENDPOINT,
+		headers={
+			"Accept": "application/vnd.github+json",
+			"X-GitHub-Api-Version": "2022-11-28"
+		}
+	)
+	print(f"Response status: HTTP {res.status_code}")
+	if res.status_code >= 400:
+		return
+	res.encoding = "utf-8"
+	print(f"Got response of size '{len(res.text)}'")
+
+	res_obj = res.json()
 	output = []
-	for url in urls:
-		soup = get_xml(url)
-		if soup is None:
+	for evt in res_obj:
+		# {
+		# 	"id": "53876916926",
+		# 	"type": "...",
+		# 	"actor": {
+		# 		"id": 1719996,
+		# 		"login": "MatheusAvellar",
+		# 		"display_login": "MatheusAvellar",
+		# 		"gravatar_id": "",
+		# 		"url": "https://api.github.com/users/MatheusAvellar",
+		# 		"avatar_url": "https://avatars.githubusercontent.com/u/1719996?"
+		# 	},
+		# 	"repo": {
+		# 		"id": ...,
+		# 		"name": "...",
+		# 		"url": "..."
+		# 	},
+		# 	"payload": { ... },
+		# 	"public": true,
+		# 	"created_at": "2025-08-27T01:25:46Z",
+		# 	"org": {
+		# 		"id": ...,
+		# 		"login": "...",
+		# 		"gravatar_id": "",
+		# 		"url": "...",
+		# 		"avatar_url": "..."
+		# 	}
+		# },
+		event_type = evt["type"]
+		if event_type == "PushEvent":
 			continue
 
-		for entry in soup.find_all("entry"):
-			# <entry>
-			# 	<id>tag:github.com,2008:PullRequestEvent/52789137971</id>
-			# 	<published>2025-07-31T14:32:52Z</published>
-			# 	<updated>2025-07-31T14:32:52Z</updated>
-			# 	<link type="text/html" rel="alternate" href="https://github.com/prefeitura-rio/pipelines_rj_sms/pull/432"/>
-			# 	<title type="html">MatheusAvellar opened a pull request in prefeitura-rio/pipelines_rj_sms</title>
-			# 	<author>
-			# 		<name>MatheusAvellar</name>
-			# 		<uri>https://github.com/MatheusAvellar</uri>
-			# 	</author>
-			# 	<media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/1719996?s=30&amp;v=4"/>
-			# 	<content type="html">...</content>
-			# </entry>
-			event_url = entry.find("link", { "rel": "alternate" }).get("href")
+		created = evt["created_at"]
+		dt = datetime.datetime.strptime(created, "%Y-%m-%dT%H:%M:%S%z")
+		# If this event is older than a month, ignore it
+		month_ago = (
+			datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(days=30)
+		)
+		if dt < month_ago:
+			continue
 
-			def get_title_parts(s):
-				# Push to branch
-				if s.startswith("pushed to"):
-					return ( "Pushed to branch", s.split("pushed to")[1].strip() )
-				# Open pull request
-				if s.startswith("opened a pull"):
-					return ( "Opened pull request", s.split("pull request in")[1].strip() )
-				# Close pull request
-				if s.startswith("closed a pull"):
-					return ( "Closed pull request", s.split("pull request in")[1].strip() )
-				# Create repository
-				if s.startswith("created a repository"):
-					return ( "Created repository", s.split("repository")[1].strip() )
-				# Create branch
-				if s.startswith("created a branch"):
-					return ( "Created branch", s.split("created a branch")[1].strip() )
-				# Delete branch
-				if s.startswith("deleted branch"):
-					return ( "Deleted branch", s.split("deleted branch")[1].strip() )
-				# Made repository public
-				m = re.match(r"^made ([^\s/]+/[^\s/]+) public", s)
-				if m is not None:
-					repo = m.group(1)
-					return ( "Made public", repo )
-				# Star repository
-				if s.startswith("starred"):
-					return ( "Starred repository", s.split("starred")[1].strip() )
-				# Close issue
-				if s.startswith("closed an issue"):
-					return ( "Closed an issue", s.split("closed an issue in")[1].strip() )
+		event_datetime = std_datetime(dt)
+		repository = evt["repo"]["name"]
+		event_url = None
+		event_description = ""
+		event_url = f"https://github.com/{repository}"
 
-				# Gist titles, unknown events
-				# Make sure first letter is capitalized
-				# (.capitalize() lowercases all other letters)
-				return ((s[:1].upper() + s[1:]), "")
-
-			event_description, event_details = get_title_parts(
-				get_text(entry.find("title")).removeprefix("MatheusAvellar ").strip()
-			)
-
-			branch = ""
-			repository = None
-			if " in " in event_details:
-				(branch, repository) = event_details.split(" in ")
-			elif " at " in event_details:
-				(branch, repository) = event_details.split(" at ")
+		payload = evt["payload"]
+		# Pull request
+		if event_type == "PullRequestEvent":
+			action = payload["action"].capitalize()
+			pr = payload["pull_request"]
+			from_branch = pr["head"]["ref"]
+			to_branch = pr["base"]["ref"]
+			event_description = f"{action} pull request ('{from_branch}' → '{to_branch}')"
+			event_url = pr["html_url"]
+		# Create
+		elif event_type == "CreateEvent":
+			branch = payload["ref"]
+			event_description = f"Created branch '{branch}'"
+		# Delete
+		elif event_type == "DeleteEvent":
+			event_description = f"""Deleted {payload["ref_type"]} '{payload["ref"]}'"""
+		# Star
+		elif event_type == "WatchEvent":
+			if payload["action"] == "started":
+				event_description = "Starred repository"
 			else:
-				repository = event_details
+				event_description = "Unstarred repository"
+		# Issue
+		elif event_type == "IssuesEvent":
+			action = payload["action"].capitalize()
+			event_description = f"{action} issue"
+			event_url = payload["issue"]["html_url"]
+		else:
+			print(f"Unrecognized event '{event_type}', please add it")
+			continue
 
-			# Too many of these, let's just ignore them
-			if event_description == "Pushed to branch":
-				continue
-			# This is a duplicate of "created repository" (in 99.99% of cases)
-			if event_description == "Created branch" and branch == "main":
-				continue
-
-			###################################
-			updated = get_text(entry.find("updated"))
-			dt = None
-			possible_formats = [
-				# This used to work
-				"%Y-%m-%dT%H:%M:%S%z",
-				# Changed to this for some reason
-				"%Y-%m-%d %H:%M:%S %z",
-				# Testing locally, got some of these too
-				"%Y-%m-%d %H:%M:%S UTC",
-				# For completeness' sake
-				"%Y-%m-%dT%H:%M:%S UTC"
-			]
-			for fmt in possible_formats:
-				try:
-					# ValueError: time data '2025-08-22 09:59:06 -0700' does not match format ...
-					dt = datetime.datetime.strptime(updated, fmt)
-					break
-				except:
-					pass
-			if dt is None:
-				print("[!] Could not find appropriate datetime format")
-				print(type(updated), updated)
-				continue
-
-			# `dt` here might not have timezone; set to UTC if so
-			if dt.tzinfo is None:
-				print("Adding timezone info")
-				dt = dt.replace(tzinfo=datetime.timezone.utc)
-
-			# If this event is older than a month, ignore it
-			month_ago = (
-				datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(days=30)
-			)
-			if dt < month_ago:
-				continue
-			###################################
-
-			event_datetime = std_datetime(dt)
-			event_type = (
-				get_text(entry.find("id"))
-				.removeprefix("tag:github.com,2008:")
-				.removeprefix("tag:gist.github.com,2008:")
-				.split("/")[0]
-			)
-
-			gh_prefix = url.removeprefix("https://").split(".")[0]
-			output.append({
-				"url": event_url,
-				"datetime": event_datetime,
-				"title": repository or event_description,
-				"type": "github",
-				"details": {
-					"event": event_type,
-					"kind": gh_prefix,
-					"description": event_description,
-					"branch": branch,
-					"repository": repository
-				}
-			})
-	print(f"Finished reading XML; got {len(output)} entries. Limiting to latest 10")
+		output.append({
+			"url": event_url,
+			"datetime": event_datetime,
+			"title": repository,
+			"type": "github",
+			"details": {
+				"event": event_type,
+				"description": event_description,
+			}
+		})
+	print(f"Finished reading JSON; got {len(output)} entries. Limiting to latest 10")
 	output.sort(reverse=True, key=lambda obj: datetime.datetime.fromisoformat(obj["datetime"]))
 	return output
 
@@ -385,7 +358,7 @@ full_rss = []
 full_rss.extend(filter_duplicates(letterboxd())[:10])
 full_rss.extend(filter_duplicates(wikipedia())[:10])
 full_rss.extend(filter_duplicates(github())[:10])
-# full_rss.extend(filter_duplicates(mal())[:10])
+full_rss.extend(filter_duplicates(mal())[:10])
 full_rss.sort(reverse=True, key=lambda obj: datetime.datetime.fromisoformat(obj["datetime"]))
 
 for obj in full_rss:
