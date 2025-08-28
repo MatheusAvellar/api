@@ -286,7 +286,6 @@ def github():
 
 		event_datetime = std_datetime(dt)
 		repository = evt["repo"]["name"]
-		event_url = None
 		event_description = ""
 		event_url = f"https://github.com/{repository}"
 
@@ -299,13 +298,18 @@ def github():
 			to_branch = pr["base"]["ref"]
 			event_description = f"{action} pull request ('{from_branch}' → '{to_branch}')"
 			event_url = pr["html_url"]
-		# Create
-		elif event_type == "CreateEvent":
-			branch = payload["ref"]
-			event_description = f"Created branch '{branch}'"
-		# Delete
-		elif event_type == "DeleteEvent":
-			event_description = f"""Deleted {payload["ref_type"]} '{payload["ref"]}'"""
+		# Create, Delete
+		elif event_type == "CreateEvent" or event_type == "DeleteEvent":
+			created_type = payload["ref_type"]
+			created_name = payload["ref"]
+			name = f"'{created_name}'" if created_name else ""
+			event_verb = "Created" if event_type == "CreateEvent" else "Deleted"
+			event_description = f"{event_verb} {created_type} {name}".strip()
+		# Fork
+		elif event_type == "ForkEvent":
+			forked_to = payload["forkee"]["full_name"]
+			event_description = f"Forked to '{forked_to}'"
+			event_url = payload["forkee"]["html_url"]
 		# Star
 		elif event_type == "WatchEvent":
 			if payload["action"] == "started":
@@ -317,6 +321,15 @@ def github():
 			action = payload["action"].capitalize()
 			event_description = f"{action} issue"
 			event_url = payload["issue"]["html_url"]
+		# Make repository public
+		elif event_type == "PublicEvent":
+			event_description = f"Made public"
+		# Release version
+		elif event_type == "ReleaseEvent":
+			action = payload["action"].capitalize()
+			tag = payload["release"]["name"]
+			event_description = f"{action} to '{tag}'"
+			event_url = payload["release"]["html_url"]
 		else:
 			print(f"Unrecognized event '{event_type}', please add it")
 			continue
@@ -327,8 +340,79 @@ def github():
 			"title": repository,
 			"type": "github",
 			"details": {
+				"kind": "github",
 				"event": event_type,
 				"description": event_description,
+			}
+		})
+	print(f"Finished reading JSON; got {len(output)} entries. Limiting to latest 10")
+	output.sort(reverse=True, key=lambda obj: datetime.datetime.fromisoformat(obj["datetime"]))
+	return output
+
+
+def gist():
+	# https://docs.github.com/en/rest/gists/gists?apiVersion=2022-11-28#list-public-gists
+	GH_ENDPOINT = "https://api.github.com/users/MatheusAvellar/gists"
+	print(f"Sending GET to '{GH_ENDPOINT}'")
+	res = requests.get(
+		url=GH_ENDPOINT,
+		headers={
+			"Accept": "application/vnd.github+json",
+			"X-GitHub-Api-Version": "2022-11-28"
+		}
+	)
+	print(f"Response status: HTTP {res.status_code}")
+	if res.status_code >= 400:
+		return
+	res.encoding = "utf-8"
+	print(f"Got response of size '{len(res.text)}'")
+
+	res_obj = res.json()
+	output = []
+	for evt in res_obj:
+		# {
+		# 	"url": "https://api.github.com/gists/...",
+		# 	"forks_url": "https://api.github.com/gists/.../forks",
+		# 	"commits_url": "https://api.github.com/gists/.../commits",
+		# 	"id": "...",
+		# 	"node_id": "...",
+		# 	"git_pull_url": "https://gist.github.com/....git",
+		# 	"git_push_url": "https://gist.github.com/....git",
+		# 	"html_url": "https://gist.github.com/MatheusAvellar/...",
+		# 	"files": { ... },
+		# 	"public": true,
+		# 	"created_at": "2025-08-12T16:06:35Z",
+		# 	"updated_at": "2025-08-12T17:14:03Z",
+		# 	"description": "...",
+		# 	"comments": 1,
+		# 	"user": null,
+		# 	"comments_enabled": true,
+		# 	"comments_url": "https://api.github.com/gists/bc0d1ec99b3559c9aaa0d676c2e5324b/comments",
+		# 	"owner": { ... },
+		# 	"truncated": false
+		# },
+		created = evt["created_at"]
+		dt = datetime.datetime.strptime(created, "%Y-%m-%dT%H:%M:%S%z")
+		# If this event is older than a month, ignore it
+		month_ago = (
+			datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(days=30)
+		)
+		if dt < month_ago:
+			continue
+		event_datetime = std_datetime(dt)
+
+		title = evt["description"]
+		event_description = ""
+		event_url = evt["html_url"]
+
+		output.append({
+			"url": event_url,
+			"datetime": event_datetime,
+			"title": title,
+			"type": "github",
+			"details": {
+				"kind": "gist",
+				"event": "GistEvent"
 			}
 		})
 	print(f"Finished reading JSON; got {len(output)} entries. Limiting to latest 10")
@@ -358,6 +442,7 @@ full_rss = []
 full_rss.extend(filter_duplicates(letterboxd())[:10])
 full_rss.extend(filter_duplicates(wikipedia())[:10])
 full_rss.extend(filter_duplicates(github())[:10])
+full_rss.extend(filter_duplicates(gist())[:10])
 full_rss.extend(filter_duplicates(mal())[:10])
 full_rss.sort(reverse=True, key=lambda obj: datetime.datetime.fromisoformat(obj["datetime"]))
 
