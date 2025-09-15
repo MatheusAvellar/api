@@ -425,6 +425,9 @@ def gist():
 
 
 def filter_duplicates(evt_list):
+	if not evt_list:
+		return []
+
 	output = []
 	seen = set()
 	for event in evt_list:
