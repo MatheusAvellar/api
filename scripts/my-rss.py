@@ -497,6 +497,7 @@ def goodreads():
 			"title": f"{book_title.split(':')[0]} ({book_year})" if book_year else book_title,
 			"type": "goodreads",
 			"details": {
+				"event": shelves,
 				"raw_title": book_title,
 				"raw_year": book_year,
 				"author": author_name,
