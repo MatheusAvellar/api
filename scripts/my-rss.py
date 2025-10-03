@@ -426,56 +426,114 @@ def gist():
 
 def goodreads():
 	custom_ua = "Mozilla/5.0 (Windows NT 10.0; selfrss@avl.la) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36"
+	#####################
+	## General updates ##
+	#####################
 	soup = get_xml(
 		"https://www.goodreads.com/review/list_rss/193877929",
 		headers={ "User-Agent": custom_ua }
 	)
-	if soup is None:
-		return []
 
+	books = dict()
 	output = []
+	if soup is None:
+		print(f"Failed reading first XML")
+	else:
+		for entry in soup.find_all("item"):
+			# <item>
+			# 	<guid><![CDATA[https://www.goodreads.com/review/show/7918416850?utm_medium=api&utm_source=rss]]></guid>
+			# 	<pubDate><![CDATA[Mon, 15 Sep 2025 18:12:35 -0700]]></pubDate>
+			# 	<title>Arrival</title>
+			# 	<link><![CDATA[https://www.goodreads.com/review/show/7918416850?utm_medium=api&utm_source=rss]]></link>
+			# 	<book_id>31625351</book_id>
+			# 	<book_image_url><![CDATA[https://i.gr-assets.com/images/S/compressed.photo.goodreads.com/books/1478010711l/31625351._SY75_.jpg]]></book_image_url>
+			# 	<book_small_image_url><![CDATA[https://i.gr-assets.com/images/S/compressed.photo.goodreads.com/books/1478010711l/31625351._SY75_.jpg]]></book_small_image_url>
+			# 	<book_medium_image_url><![CDATA[https://i.gr-assets.com/images/S/compressed.photo.goodreads.com/books/1478010711l/31625351._SX98_.jpg]]></book_medium_image_url>
+			# 	<book_large_image_url><![CDATA[https://i.gr-assets.com/images/S/compressed.photo.goodreads.com/books/1478010711l/31625351._SY475_.jpg]]></book_large_image_url>
+			# 	<book_description><![CDATA[From a soaring Babylonian tower that connects a flat Earth with the heavens above, to a world where angelic visitations are a wondrous and terrifying part of everyday life; from a neural modification that eliminates the appeal of physical beauty, to an alien language that challenges our very perception of time and reality... Chiang's rigorously imagined stories invite us to question our understanding of the universe and our place in it.]]></book_description>
+			# 	<book id="31625351">
+			# 		<num_pages>304</num_pages>
+			# 	</book>
+			# 	<author_name>Ted Chiang</author_name>
+			# 	<isbn>0525433678</isbn>
+			# 	<user_name>Matheus</user_name>
+			# 	<user_rating>0</user_rating>
+			# 	<user_read_at></user_read_at>
+			# 	<user_date_added><![CDATA[Mon, 15 Sep 2025 18:12:35 -0700]]></user_date_added>
+			# 	<user_date_created><![CDATA[Mon, 15 Sep 2025 17:43:39 -0700]]></user_date_created>
+			# 	<user_shelves>to-read</user_shelves>
+			# 	<user_review></user_review>
+			# 	<average_rating>4.10</average_rating>
+			# 	<book_published>2002</book_published>
+			# 	<description>
+			# 		<![CDATA[
+			# 			<a href="https://www.goodreads.com/book/show/31625351-arrival?utm_medium=api&amp;utm_source=rss"><img alt="Arrival" src="https://i.gr-assets.com/images/S/compressed.photo.goodreads.com/books/1478010711l/31625351._SY75_.jpg" /></a><br/>
+			# 			author: Ted Chiang<br/>
+			# 			name: Matheus<br/>
+			# 			average rating: 4.10<br/>
+			# 			book published: 2002<br/>
+			# 			rating: 0<br/>
+			# 			read at: <br/>
+			# 			date added: 2025/09/15<br/>
+			# 			shelves: to-read<br/>
+			# 			review: <br/><br/>
+			# 		]]>
+			# 	</description>
+			# </item>
+
+			review_url = get_text(entry.find("link"))
+			pubDate = get_text(entry.find("pubDate"))
+			dt = datetime.datetime.strptime(pubDate, "%a, %d %b %Y %H:%M:%S %z")
+			# If this event is older than a month, ignore it
+			if dt < (datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(days=30)):
+				continue
+			review_datetime = std_datetime(dt)
+			book_title = get_text(entry.find("title"))
+			book_year = get_text(entry.find("book_published"))
+			books[book_title] = book_year
+			rating = get_text(entry.find("user_rating"))
+			isbn = get_text(entry.find("isbn"))
+			description = get_text(entry.find("description"))
+			author_name = get_text(entry.find("author_name"))
+			shelves = get_text(entry.find("user_shelves"))
+			# cover_url = get_text(entry.find("book_small_image_url"))
+			output.append({
+				"url": review_url,
+				"datetime": review_datetime,
+				"title": f"{book_title.split(':')[0]} ({book_year})" if book_year else book_title,
+				"type": "goodreads",
+				"details": {
+					"event": "added",
+					"raw_title": book_title,
+					"raw_year": book_year,
+					"author": author_name,
+					"rating": rating if rating != "0" else "",
+					"shelves": shelves,
+					"isbn": isbn,
+					# "cover_url": cover_url
+				}
+			})
+
+
+	#####################
+	## Page updates    ##
+	#####################
+	soup = get_xml(
+		"https://www.goodreads.com/user_status/list/193877929-matheus-avellar?format=rss",
+		headers={ "User-Agent": custom_ua }
+	)
+	if soup is None:
+		print(f"Failed reading second XML; got {len(output)} entries. Limiting to latest 10")
+		return output.sort(reverse=True, key=lambda obj: datetime.datetime.fromisoformat(obj["datetime"]))
+
 	for entry in soup.find_all("item"):
 		# <item>
-		# 	<guid><![CDATA[https://www.goodreads.com/review/show/7918416850?utm_medium=api&utm_source=rss]]></guid>
-		# 	<pubDate><![CDATA[Mon, 15 Sep 2025 18:12:35 -0700]]></pubDate>
-		# 	<title>Arrival</title>
-		# 	<link><![CDATA[https://www.goodreads.com/review/show/7918416850?utm_medium=api&utm_source=rss]]></link>
-		# 	<book_id>31625351</book_id>
-		# 	<book_image_url><![CDATA[https://i.gr-assets.com/images/S/compressed.photo.goodreads.com/books/1478010711l/31625351._SY75_.jpg]]></book_image_url>
-		# 	<book_small_image_url><![CDATA[https://i.gr-assets.com/images/S/compressed.photo.goodreads.com/books/1478010711l/31625351._SY75_.jpg]]></book_small_image_url>
-		# 	<book_medium_image_url><![CDATA[https://i.gr-assets.com/images/S/compressed.photo.goodreads.com/books/1478010711l/31625351._SX98_.jpg]]></book_medium_image_url>
-		# 	<book_large_image_url><![CDATA[https://i.gr-assets.com/images/S/compressed.photo.goodreads.com/books/1478010711l/31625351._SY475_.jpg]]></book_large_image_url>
-		# 	<book_description><![CDATA[From a soaring Babylonian tower that connects a flat Earth with the heavens above, to a world where angelic visitations are a wondrous and terrifying part of everyday life; from a neural modification that eliminates the appeal of physical beauty, to an alien language that challenges our very perception of time and reality... Chiang's rigorously imagined stories invite us to question our understanding of the universe and our place in it.]]></book_description>
-		# 	<book id="31625351">
-		# 		<num_pages>304</num_pages>
-		# 	</book>
-		# 	<author_name>Ted Chiang</author_name>
-		# 	<isbn>0525433678</isbn>
-		# 	<user_name>Matheus</user_name>
-		# 	<user_rating>0</user_rating>
-		# 	<user_read_at></user_read_at>
-		# 	<user_date_added><![CDATA[Mon, 15 Sep 2025 18:12:35 -0700]]></user_date_added>
-		# 	<user_date_created><![CDATA[Mon, 15 Sep 2025 17:43:39 -0700]]></user_date_created>
-		# 	<user_shelves>to-read</user_shelves>
-		# 	<user_review></user_review>
-		# 	<average_rating>4.10</average_rating>
-		# 	<book_published>2002</book_published>
-		# 	<description>
-		# 		<![CDATA[
-		# 			<a href="https://www.goodreads.com/book/show/31625351-arrival?utm_medium=api&amp;utm_source=rss"><img alt="Arrival" src="https://i.gr-assets.com/images/S/compressed.photo.goodreads.com/books/1478010711l/31625351._SY75_.jpg" /></a><br/>
-		# 			author: Ted Chiang<br/>
-		# 			name: Matheus<br/>
-		# 			average rating: 4.10<br/>
-		# 			book published: 2002<br/>
-		# 			rating: 0<br/>
-		# 			read at: <br/>
-		# 			date added: 2025/09/15<br/>
-		# 			shelves: to-read<br/>
-		# 			review: <br/><br/>
-		# 		]]>
-		# 	</description>
+		# 	<title>Matheus Avellar is on page 70 of 432 of Tales of Old Japan</title>
+		# 	<description></description>
+		# 	<pubDate>Fri, 03 Oct 2025 05:35:46 -0700</pubDate>
+		# 	<guid>https://www.goodreads.com/user_status/show/1140465388</guid>
+		# 	<link>https://www.goodreads.com/user_status/show/1140465388</link>
 		# </item>
-
 		review_url = get_text(entry.find("link"))
 		pubDate = get_text(entry.find("pubDate"))
 		dt = datetime.datetime.strptime(pubDate, "%a, %d %b %Y %H:%M:%S %z")
@@ -483,33 +541,35 @@ def goodreads():
 		if dt < (datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(days=30)):
 			continue
 		review_datetime = std_datetime(dt)
-		book_title = get_text(entry.find("title"))
-		book_year = get_text(entry.find("book_published"))
-		rating = get_text(entry.find("user_rating"))
-		isbn = get_text(entry.find("isbn"))
-		description = get_text(entry.find("description"))
-		author_name = get_text(entry.find("author_name"))
-		shelves = get_text(entry.find("user_shelves"))
-		# cover_url = get_text(entry.find("book_small_image_url"))
+
+		title = get_text(entry.find("title"))
+		matches = re.search(r"^.+ is on page (?P<read>[0-9]+) of (?P<total>[0-9]+) of (?P<title>.+)$", title)
+		if matches is None:
+			print(f"Unrecognized Goodreads event: '{title}'")
+		pages_read = matches.group("read")
+		pages_total = matches.group("total")
+		book_title = matches.group("title")
+		book_year = books[book_title] if book_title in books else None
+
 		output.append({
 			"url": review_url,
 			"datetime": review_datetime,
 			"title": f"{book_title.split(':')[0]} ({book_year})" if book_year else book_title,
 			"type": "goodreads",
 			"details": {
-				"event": shelves,
+				"event": "pages-read",
 				"raw_title": book_title,
 				"raw_year": book_year,
 				"author": author_name,
-				"rating": rating if rating != "0" else "",
-				"shelves": shelves,
-				"isbn": isbn,
-				# "cover_url": cover_url
+				"pages_read": pages_read,
+				"pages_total": pages_total
 			}
 		})
+
 	print(f"Finished reading XML; got {len(output)} entries. Limiting to latest 10")
 	output.sort(reverse=True, key=lambda obj: datetime.datetime.fromisoformat(obj["datetime"]))
 	return output
+
 
 def filter_duplicates(evt_list):
 	if not evt_list:
