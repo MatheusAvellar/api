@@ -560,7 +560,6 @@ def goodreads():
 				"event": "pages-read",
 				"raw_title": book_title,
 				"raw_year": book_year,
-				"author": author_name,
 				"pages_read": pages_read,
 				"pages_total": pages_total
 			}
