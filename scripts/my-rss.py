@@ -297,7 +297,7 @@ def github():
 			from_branch = pr["head"]["ref"]
 			to_branch = pr["base"]["ref"]
 			event_description = f"{action} pull request ('{from_branch}' → '{to_branch}')"
-			event_url = pr["html_url"]
+			event_url = pr["url"]
 		# Create, Delete
 		elif event_type == "CreateEvent" or event_type == "DeleteEvent":
 			created_type = payload["ref_type"]
@@ -309,7 +309,7 @@ def github():
 		elif event_type == "ForkEvent":
 			forked_to = payload["forkee"]["full_name"]
 			event_description = f"Forked to '{forked_to}'"
-			event_url = payload["forkee"]["html_url"]
+			event_url = payload["forkee"]["url"]
 		# Star
 		elif event_type == "WatchEvent":
 			if payload["action"] == "started":
@@ -320,7 +320,7 @@ def github():
 		elif event_type == "IssuesEvent":
 			action = payload["action"].capitalize()
 			event_description = f"{action} issue"
-			event_url = payload["issue"]["html_url"]
+			event_url = payload["issue"]["url"]
 		# Make repository public
 		elif event_type == "PublicEvent":
 			event_description = f"Made public"
@@ -329,7 +329,7 @@ def github():
 			action = payload["action"].capitalize()
 			tag = payload["release"]["name"]
 			event_description = f"{action} to '{tag}'"
-			event_url = payload["release"]["html_url"]
+			event_url = payload["release"]["url"]
 		else:
 			print(f"Unrecognized event '{event_type}', please add it")
 			continue
