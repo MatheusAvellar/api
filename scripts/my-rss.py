@@ -293,6 +293,7 @@ def github():
 		# Pull request
 		if event_type == "PullRequestEvent":
 			action = payload["action"].capitalize()
+			if action.lower().endswith("labeled"): continue
 			pr = payload["pull_request"]
 			from_branch = pr["head"]["ref"]
 			to_branch = pr["base"]["ref"]
