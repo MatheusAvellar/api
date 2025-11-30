@@ -544,12 +544,21 @@ def goodreads():
 		review_datetime = std_datetime(dt)
 
 		title = get_text(entry.find("title"))
-		matches = re.search(r"^.+ is on page (?P<read>[0-9]+) of (?P<total>[0-9]+) of (?P<title>.+)$", title)
-		if matches is None:
-			print(f"Unrecognized Goodreads event: '{title}'")
-		pages_read = matches.group("read")
-		pages_total = matches.group("total")
-		book_title = matches.group("title")
+		pages_read_matches = re.search(r"^.+ is on page (?P<read>[0-9]+) of (?P<total>[0-9]+) of (?P<title>.+)$", title)
+		finished_matches = re.search(r"^.+ is finished with (?P<title>.+)$", title)
+		if pages_read_matches is not None:
+			pages_read = pages_read_matches.group("read")
+			pages_total = pages_read_matches.group("total")
+			book_title = pages_read_matches.group("title")
+			event_type = "pages-read"
+		elif finished_matches is not None:
+			pages_read = -1
+			pages_total = -1
+			book_title = finished_matches.group("title")
+			event_type = "finished"
+		else:
+			print(f"Ignoring unrecognized Goodreads event: '{title}'")
+			continue
 		book_year = books[book_title] if book_title in books else None
 
 		output.append({
@@ -558,7 +567,7 @@ def goodreads():
 			"title": f"{book_title.split(':')[0]} ({book_year})" if book_year else book_title,
 			"type": "goodreads",
 			"details": {
-				"event": "pages-read",
+				"event": event_type,
 				"raw_title": book_title,
 				"raw_year": book_year,
 				"pages_read": pages_read,
