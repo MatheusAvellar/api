@@ -193,12 +193,12 @@ def mal():
 		anime_title = item.find("title").get_text()
 		anime_url = item.find("link").get_text()
 		description = item.find("description").get_text()
-		matches = re.search(r"(?P<status>.+) - (?P<watched>[0-9]+) of (?P<total>[0-9]+) episodes", description)
+		matches = re.search(r"(?P<status>[^\-]*) - (?P<watched>[0-9]+) of (?P<total>[0-9]+) episodes", description)
 		watch_status = None
 		episodes_watched = None
 		episodes_total = None
 		if matches:
-			watch_status = matches.group("status")
+			watch_status = matches.group("status") or ""
 			episodes_watched = matches.group("watched")
 			episodes_total = matches.group("total")
 		pubDate = item.find("pubDate").get_text()
