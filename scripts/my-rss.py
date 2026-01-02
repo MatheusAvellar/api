@@ -68,29 +68,43 @@ def letterboxd():
 		# If this event is older than a month, ignore it
 		if dt < (datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(days=30)):
 			continue
-		review_datetime = std_datetime(dt)
+		published_datetime = std_datetime(dt)
+
 		watched_date = get_text(review.find("letterboxd:watchedDate"))
 		is_rewatch = get_text(review.find("letterboxd:rewatch")) != "No"
+		# <title> if list
+		title = get_text(review.find("title"))
+		# <letterboxd:filmTitle> if film
 		film_title = get_text(review.find("letterboxd:filmTitle"))
 		film_year = get_text(review.find("letterboxd:filmYear"))
 		rating = get_text(review.find("letterboxd:memberRating"))
 		tmdb_id = get_text(review.find("tmdb:movieId"))
 		description = get_text(review.find("description"))
 		# poster_url = (re.search(r"<img src=\"([^\"]+)\"", description) or [0,""])[1]
+
 		output.append({
 			"url": review_url,
-			"datetime": review_datetime,
-			"title": f"{film_title} ({film_year})" if film_year else film_title,
+			"datetime": published_datetime,
+			"title": (
+				f"{film_title} ({film_year})"
+				if film_title and film_year
+				else (
+					film_title
+					if film_title
+					else title
+				)
+			),
 			"type": "letterboxd",
 			"details": {
-				"event": "review",
-				"watched_date": watched_date,
-				"is_rewatch": is_rewatch,
-				"raw_title": film_title,
-				"raw_year": film_year,
-				"rating": rating,
-				"tmdb_id": tmdb_id,
-				# "poster_url": poster_url
+				"event": "review" if film_title else "list",
+				**({
+					"watched_date": watched_date,
+					"is_rewatch": is_rewatch,
+					"raw_title": film_title,
+					"raw_year": film_year,
+					"rating": rating,
+					"tmdb_id": tmdb_id,
+				} if film_title else {})
 			}
 		})
 	print(f"Finished reading XML; got {len(output)} entries. Limiting to latest 10")
