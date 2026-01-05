@@ -1,0 +1,48 @@
+name: Quick RSS update
+
+on:
+  # schedule:
+    # Runs every 15 minutes, from 9:00-24:00 BRT every day (in theory)
+    # - cron: '*/15 0-3,12-23 * * *'
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# Sets the permissions for the GITHUB_TOKEN for this workflow
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  fetch_and_deploy:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    env:
+      LC_ALL: en_US.UTF-8
+      LANG: en_US.UTF-8
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # [Ref] https://ashishb.net/programming/common-pitfalls-of-github-actions/
+      - name: Cache step
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Fetch RSS feeds
+        run: |
+          python3 -m pip install -r ./scripts/requirements.txt
+          python3 ./scripts/lastfm.py
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './public'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
